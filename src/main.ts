@@ -16,8 +16,6 @@ import { useAuthStore } from "@/stores/auth"
 
 const auth = useAuthStore()
 
-if (!auth.token) {
-  auth.devLogin("ADMIN")
-  auth.devLogin("MANAGER")
-  auth.devLogin("EMPLOYE")
+if (auth.token) {
+  auth.fetchMe()
 }
