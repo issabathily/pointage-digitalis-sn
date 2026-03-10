@@ -30,61 +30,64 @@ const router = createRouter({
       ],
     },
     
-  {
-  path: "/",
-  component: DashboardLayout,
-  meta: { requiresAuth: true },
-  children: [
-    { path: "", redirect: "/dashboard" },
-    { path: "dashboard", component: DashboardView },
-    { path: "pointage", component: PointageView },
-    { path: "absences", component: AbsencesView },
-    { 
-      path: "reports",
-      component: ReportsView,
-      meta: { role: ["ADMIN", "MANAGER"] }
+    {
+  path: "/dashboard",
+  name: "dashboard",
+  component: () => import("@/views/DashboardView.vue")
     },
-    { 
-      path: "employees",
-      component: EmployeesView,
-      meta: { role: ["ADMIN", "MANAGER"] }
-    }
-  ]
-},
-  ],
+
+    {
+    path: "/",
+    component: DashboardLayout,
+    meta: { requiresAuth: true },
+    children: [
+      { path: "", redirect: "/dashboard" },
+      { path: "dashboard", component: DashboardView },
+      { path: "pointage", component: PointageView },
+      { path: "absences", component: AbsencesView },
+      { 
+        path: "reports",
+        component: ReportsView,
+        meta: { role: ["ADMIN", "MANAGER"] }
+      },
+      { 
+        path: "employees",
+        component: EmployeesView,
+        meta: { role: ["ADMIN", "MANAGER"] }
+      }
+    ]
+    },
+          ],
 })
 
 
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
+
   const auth = useAuthStore()
 
-  if (to.path === "/login") {
-    return next()
-  }
-
-  if (auth.token && !auth.user) {
-    try {
-      await auth.fetchMe()
-    } catch (error) {
-      auth.logout()
-      return next("/login")
-    }
-  }
-
+  // vérifier si login requis
   if (to.meta.requiresAuth && !auth.token) {
     return next("/login")
   }
 
+  // vérifier les rôles
   if (to.meta.role) {
+
     const allowedRoles = to.meta.role as string[]
 
-    if (!auth.user || !allowedRoles.includes(auth.user.role)) {
+    if (!auth.user) {
+      return next("/login")
+    }
+
+    if (!allowedRoles.includes(auth.user.role)) {
       return next("/dashboard")
     }
+
   }
 
   next()
+
 })
 
  

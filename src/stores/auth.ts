@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import axios from "axios"
 
-const API = "https://projet-de-pointage-digitalis-4.onrender.com/api"
+const API = "https://projet-de-pointage-digitalis-3.onrender.com/api"
 
 interface User {
   id: number
@@ -26,35 +26,21 @@ export const useAuthStore = defineStore("auth", {
 
   actions: {
 
-    async login(email: string, password: string) {
+async login(email: string, password: string) {
 
-      const response = await axios.post(
-        `${API}/auth/login/`,
-        { email, password }
-      )
+  const response = await axios.post(
+    `${API}/auth/login/`,
+    {
+      email: email,
+      password: password
+    }
+  )
+    const token = response.data.access
 
-      const token = response.data.access
-
-      this.token = token
-      localStorage.setItem("token", token)
-
-      await this.fetchMe()
-    },
-
-    async fetchMe() {
-
-      const response = await axios.get(
-        `${API}/auth/me/`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.token}`
-          }
-        }
-      )
-
-      this.user = response.data
-    },
-
+  this.token = token
+  localStorage.setItem("token", token)
+},
+ 
     logout() {
       this.token = null
       this.user = null

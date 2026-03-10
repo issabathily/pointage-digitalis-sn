@@ -18,9 +18,9 @@ async function handleLogin() {
 
     router.push("/dashboard")
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value = "Email ou mot de passe incorrect"
+    console.error(error)
 
   }
 
@@ -38,19 +38,9 @@ Connexion
 
 <form @submit.prevent="handleLogin" class="space-y-4">
 
-<input
-v-model="email"
-type="email"
-placeholder="Email"
-class="w-full border rounded-lg p-2"
-/>
+<input v-model="email" type="email" placeholder="Email" class="w-full border rounded-lg p-2"/>
 
-<input
-v-model="password"
-type="password"
-placeholder="Mot de passe"
-class="w-full border rounded-lg p-2"
-/>
+<input v-model="password" type="password" placeholder="Mot de passe" class="w-full border rounded-lg p-2"/>
 
 <p v-if="error" class="text-red-500 text-sm">
 {{ error }}

@@ -21,7 +21,7 @@ export const usePointageStore = defineStore("pointages", {
 
   actions: {
     async fetchPointages() {
-      const response = await axios.get("https://projet-de-pointage-digitalis-4.onrender.com/api/pointages/")
+      const response = await axios.get("https://projet-de-pointage-digitalis-3.onrender.com/api/pointages/")
       this.pointages = response.data
     }
   }
