@@ -12,11 +12,14 @@ onMounted(() => {
 
   scanner = new Html5Qrcode("qr-reader")
 
+  const viewport = Math.min(window.innerWidth || 360, 480)
+  const qrSize = Math.max(180, Math.min(260, viewport - 80))
+
   scanner.start(
     { facingMode: "environment" },
     {
       fps: 10,
-      qrbox: 250,
+      qrbox: { width: qrSize, height: qrSize },
     },
     (decodedText) => {
       emit("scanned", decodedText)
@@ -38,7 +41,7 @@ onBeforeUnmount(async () => {
 </script>
 
 <template>
-  <div class="bg-white p-4 rounded-xl shadow">
-    <div id="qr-reader" ref="scannerRef"></div>
+  <div class="bg-white p-3 sm:p-4 rounded-xl shadow overflow-hidden">
+    <div id="qr-reader" ref="scannerRef" class="w-full max-w-full"></div>
   </div>
 </template>

@@ -6,3 +6,8 @@
   --color-accent: #e07e27;
   --color-dark: #484848;
 }
+
+button,
+[role="button"] {
+  cursor: pointer;
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, onMounted, computed } from "vue"
 import {
   Chart as ChartJS,
   Title,
@@ -10,6 +10,8 @@ import {
   LinearScale
 } from "chart.js"
 import { Bar } from "vue-chartjs"
+import type { ChartOptions } from "chart.js"
+import { reportsService, type AttendanceStats } from "@/services/reports.service"
 
 ChartJS.register(
   Title,
@@ -19,7 +21,6 @@ ChartJS.register(
   CategoryScale,
   LinearScale
 )
-import type { ChartOptions } from "chart.js"
 
 const chartOptions: ChartOptions<'bar'> = {
   responsive: true,
@@ -29,35 +30,27 @@ const chartOptions: ChartOptions<'bar'> = {
     },
   },
 }
-import { onMounted } from "vue"
-import { computed } from "vue"
-import { useEmployeesStore } from "@/stores/employees"
 
-const employeesStore = useEmployeesStore()
-const stats = computed(() => {
-  const presents = employeesStore.employees.filter(e => e.statut === "PRESENT").length
-  const retards = employeesStore.employees.filter(e => e.statut === "RETARD").length
-  const absents = employeesStore.employees.filter(e => e.statut === "ABSENT").length
-
-  const total = employeesStore.employees.length
-
-  const tauxPonctualite = total > 0
-    ? ((presents / total) * 100).toFixed(1)
-    : 0
-
-  return {
-    presents,
-    retards,
-    absents,
-    tauxPonctualite
-  }
+const stats = ref<AttendanceStats>({
+  total_employees: 0,
+  presents: 0,
+  retards: 0,
+  absents: 0,
+  taux_ponctualite: 0
 })
 
+const loading = ref(true)
+const error = ref("")
 
-
-
-onMounted(() => {
-  employeesStore.fetchEmployees()
+onMounted(async () => {
+  try {
+    stats.value = await reportsService.getAttendanceStats()
+  } catch (e: any) {
+    error.value = "Impossible de charger les statistiques."
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
 })
 
 import jsPDF from "jspdf"
@@ -74,19 +67,18 @@ const exportPDF = () => {
 
   autoTable(doc, {
     startY: 40,
-    head: [["Nom", "Rôle", "Statut"]],
-    body: employeesStore.employees.map(emp => [
-      emp.nom,
-      emp.role,
-      emp.statut
-    ]),
+    head: [["Statut", "Nombre"]],
+    body: [
+      ["Présents", stats.value.presents.toString()],
+      ["Retards", stats.value.retards.toString()],
+      ["Absents", stats.value.absents.toString()],
+      ["Taux ponctualité", stats.value.taux_ponctualite + "%"]
+    ],
   })
 
   doc.save("rapport-pointage.pdf")
 }
 
-
-// Données simulées (backend viendra après)
 const chartData = computed(() => ({
   labels: ["Présents", "Retards", "Absents"],
   datasets: [
@@ -105,66 +97,69 @@ const chartData = computed(() => ({
     }
   ]
 }))
-
-
 </script>
 
 <template>
-  <div class="flex justify-between items-center mb-4">
-  <h1 class="text-2xl font-bold text-dark">Rapports</h1>
-
-  <button
-    @click="exportPDF"
-    class="bg-primary text-white px-4 py-2 rounded-lg
-           hover:bg-secondary transition-all duration-200"
-  >
-    Exporter en PDF
-  </button>
-</div>
-
   <div class="space-y-6">
 
-    <div>
-      <h1 class="text-2xl font-bold text-dark">
-        Rapports & Statistiques
-      </h1>
-      <p class="text-gray-500">
-        Analyse des absences et retards
-      </p>
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-dark">Rapports</h1>
+        <p class="text-gray-500 text-sm mt-1">Analyse des absences et retards</p>
+      </div>
+      <button
+        @click="exportPDF"
+        :disabled="loading"
+        class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-secondary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Exporter en PDF
+      </button>
     </div>
-  <div class="grid grid-cols-4 gap-6 mb-6">
 
-  <div class="bg-white p-6 rounded-2xl shadow-sm">
-    <p class="text-gray-500 text-sm">Présents</p>
-    <h2 class="text-2xl font-bold text-secondary">
-      {{ stats.presents }}
-    </h2>
-  </div>
+    <!-- Error -->
+    <div v-if="error" class="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl">
+      {{ error }}
+    </div>
 
-  <div class="bg-white p-6 rounded-2xl shadow-sm">
-    <p class="text-gray-500 text-sm">Retards</p>
-    <h2 class="text-2xl font-bold text-accent">
-      {{ stats.retards }}
-    </h2>
-  </div>
+    <!-- Loader -->
+    <div v-if="loading" class="flex justify-center items-center py-12">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+    </div>
 
-  <div class="bg-white p-6 rounded-2xl shadow-sm">
-    <p class="text-gray-500 text-sm">Absents</p>
-    <h2 class="text-2xl font-bold text-primary">
-      {{ stats.absents }}
-    </h2>
-  </div>
+    <!-- Stats Cards -->
+    <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-white p-6 rounded-2xl shadow-sm">
+        <p class="text-gray-500 text-sm">Présents</p>
+        <h2 class="text-2xl font-bold text-secondary">
+          {{ stats.presents }}
+        </h2>
+      </div>
 
-  <div class="bg-white p-6 rounded-2xl shadow-sm">
-    <p class="text-gray-500 text-sm">Taux ponctualité</p>
-    <h2 class="text-2xl font-bold text-dark">
-      {{ stats.tauxPonctualite }}%
-    </h2>
-  </div>
+      <div class="bg-white p-6 rounded-2xl shadow-sm">
+        <p class="text-gray-500 text-sm">Retards</p>
+        <h2 class="text-2xl font-bold text-accent">
+          {{ stats.retards }}
+        </h2>
+      </div>
 
-</div>
+      <div class="bg-white p-6 rounded-2xl shadow-sm">
+        <p class="text-gray-500 text-sm">Absents</p>
+        <h2 class="text-2xl font-bold text-primary">
+          {{ stats.absents }}
+        </h2>
+      </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm">
+        <p class="text-gray-500 text-sm">Taux ponctualité</p>
+        <h2 class="text-2xl font-bold text-dark">
+          {{ stats.taux_ponctualite }}%
+        </h2>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div v-if="!loading" class="bg-white rounded-2xl shadow-sm p-6">
       <Bar :data="chartData" :options="chartOptions" />
     </div>
 

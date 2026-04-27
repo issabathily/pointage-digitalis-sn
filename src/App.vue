@@ -5,6 +5,7 @@
       mode="out-in"
     >
       <component :is="Component" />
+<!--      <ManagerPointageView/>-->
     </transition>
   </router-view>
 </template>
@@ -20,3 +21,6 @@
   opacity: 0;
 }
 </style>
+<script setup lang="ts">
+import ManagerPointageView from '@/views/ManagerPointageView.vue'
+</script>

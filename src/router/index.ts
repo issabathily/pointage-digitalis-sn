@@ -10,7 +10,8 @@ import AbsencesView from "@/views/AbsencesView.vue"
 import ReportsView from "@/views/ReportsView.vue"
 import { useAuthStore } from '@/stores/auth'
 import EmployeesView from "@/views/EmployeesView.vue"
-
+import ManagerPointageView from "@/views/ManagerPointageView.vue"
+import MonCalendrierView from "@/views/MonCalendrierView.vue"
 
 
 
@@ -29,12 +30,6 @@ const router = createRouter({
         },
       ],
     },
-    
-    {
-  path: "/dashboard",
-  name: "dashboard",
-  component: () => import("@/views/DashboardView.vue")
-    },
 
     {
     path: "/",
@@ -45,6 +40,7 @@ const router = createRouter({
       { path: "dashboard", component: DashboardView },
       { path: "pointage", component: PointageView },
       { path: "absences", component: AbsencesView },
+      { path: "mon-calendrier", component: MonCalendrierView },
       { 
         path: "reports",
         component: ReportsView,
@@ -53,6 +49,11 @@ const router = createRouter({
       { 
         path: "employees",
         component: EmployeesView,
+        meta: { role: ["ADMIN", "MANAGER"] }
+      },
+      { 
+        path: "manager-pointage",
+        component: ManagerPointageView,
         meta: { role: ["ADMIN", "MANAGER"] }
       }
     ]
