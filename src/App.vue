@@ -5,7 +5,7 @@
       mode="out-in"
     >
       <component :is="Component" />
-<!--      <ManagerPointageView/>-->
+<!--  <ManagerPointageView/>-->
     </transition>
   </router-view>
 </template>
