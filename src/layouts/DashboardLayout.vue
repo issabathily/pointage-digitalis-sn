@@ -199,6 +199,7 @@ const bottomNavItems = computed(() => {
 
         <!-- Employés -->
         <RouterLink
+          v-if="auth.isAdmin || auth.user?.role === 'MANAGER'"
           to="/employees"
           class="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group"
           :class="[

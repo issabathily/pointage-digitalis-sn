@@ -4,6 +4,7 @@ import { Html5Qrcode } from "html5-qrcode"
 
 const scannerRef = ref<HTMLDivElement | null>(null)
 let scanner: Html5Qrcode | null = null
+let isRunning = false
 
 const emit = defineEmits(["scanned"])
 
@@ -23,18 +24,37 @@ onMounted(() => {
     },
     (decodedText) => {
       emit("scanned", decodedText)
-      scanner?.stop()
+      stopScanner()
     },
     (errorMessage) => {
-      console.log("Scan error:", errorMessage)
+      // Ignorer les erreurs de scan normales
     }
-  )
+  ).then(() => {
+    isRunning = true
+  }).catch((err) => {
+    console.error("Erreur de démarrage du scanner:", err)
+  })
 })
 
+const stopScanner = async () => {
+  if (scanner && isRunning) {
+    try {
+      await scanner.stop()
+      isRunning = false
+    } catch (err) {
+      console.error("Erreur lors de l'arrêt du scanner:", err)
+    }
+  }
+}
+
 onBeforeUnmount(async () => {
+  await stopScanner()
   if (scanner) {
-    await scanner.stop()
-    await scanner.clear()
+    try {
+      await scanner.clear()
+    } catch (err) {
+      console.error("Erreur lors du nettoyage du scanner:", err)
+    }
   }
 })
 

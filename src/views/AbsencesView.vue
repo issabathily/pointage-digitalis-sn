@@ -115,7 +115,7 @@ const submitAbsence = async () => {
          FORMULAIRE NOUVELLE DEMANDE
     ════════════════════════════════════════ -->
     <div
-      v-if="auth.user?.role !== 'ADMIN'"
+      v-if="auth.user?.role === 'EMPLOYE'"
       class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden"
     >
       <!-- Header du formulaire -->
@@ -290,13 +290,15 @@ const submitAbsence = async () => {
     </div>
 
     <!-- ═══════════════════════════════════════
-         MES DEMANDES
+         DEMANDES D'ABSENCE
     ════════════════════════════════════════ -->
     <div class="space-y-4">
 
       <!-- Header section -->
       <div class="flex items-center gap-3">
-        <h2 class="text-xl font-bold text-dark">Mes demandes</h2>
+        <h2 class="text-xl font-bold text-dark">
+          {{ auth.user?.role === 'EMPLOYE' ? 'Mes demandes' : 'Demandes d\'absence' }}
+        </h2>
         <span
           v-if="filteredAbsences.length"
           class="bg-primary/10 text-primary text-xs font-bold px-2.5 py-1 rounded-full"

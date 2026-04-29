@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import QrcodeVue from "qrcode.vue"
 import { useAuthStore } from "@/stores/auth"
-import { QrCode } from "lucide-vue-next"
+import { QrCode, Sunrise, Sunset } from "lucide-vue-next"
 import api from "@/services/api"
 
 const auth = useAuthStore()
@@ -15,7 +15,7 @@ const updateViewportWidth = () => {
 onMounted(() => {
   updateViewportWidth()
   window.addEventListener("resize", updateViewportWidth, { passive: true })
-  fetchActiveSession()
+  fetchActiveSession("ENTREE")
 })
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateViewportWidth)
@@ -30,6 +30,7 @@ const qrSize = computed(() => {
 const managerSession = ref<any>(null)
 const loadingSession = ref(true)
 const sessionError = ref("")
+const currentType = ref<"ENTREE" | "SORTIE">("ENTREE")
 
 const hasActiveSession = computed(() => {
   return managerSession.value && managerSession.value.date === today && managerSession.value.session_id
@@ -37,26 +38,28 @@ const hasActiveSession = computed(() => {
 
 const employeeQrPayload = computed(() => {
   if (!managerSession.value) return ""
+  // Simplifier le payload pour le QR code
   const payload = {
-    kind: "EMPLOYEE_ATTENDANCE_QR",
-    sessionId: managerSession.value.session_id,
-    date: today,
-    employeeId: auth.user?.id ?? 0,
-    employeeNom: auth.user?.nom ?? "Employe",
-    type: managerSession.value.type ?? "ENTREE",
+    k: "E", // kind: EMPLOYEE
+    s: managerSession.value.session_id,
+    d: today,
+    e: auth.user?.id ?? 0,
+    n: auth.user?.nom ?? "Employe",
+    t: currentType.value,
   }
   return JSON.stringify(payload)
 })
 
-const fetchActiveSession = async () => {
+const fetchActiveSession = async (type: "ENTREE" | "SORTIE") => {
   loadingSession.value = true
   sessionError.value = ""
+  currentType.value = type
   try {
-    const response = await api.get("/qr/manager/session/active/?type=ENTREE")
+    const response = await api.get(`/qr/manager/session/active/?type=${type}`)
     managerSession.value = response.data
   } catch (error: any) {
     if (error.response?.status === 404) {
-      sessionError.value = "Aucune session active pour aujourd'hui"
+      sessionError.value = `Aucune session ${type.toLowerCase()} active pour aujourd'hui`
     } else {
       console.error("Erreur lors de la récupération de la session:", error)
       sessionError.value = "Erreur de connexion au serveur"
@@ -85,23 +88,54 @@ const fetchActiveSession = async () => {
     </div>
 
     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-8">
-      <div v-if="!hasActiveSession" class="text-center space-y-3">
-        <p class="text-sm font-semibold text-amber-600">Aucun QR manager actif pour aujourd'hui.</p>
+      <div v-if="loadingSession" class="text-center space-y-3">
+        <p class="text-sm text-gray-500">Chargement...</p>
+      </div>
+
+      <div v-else-if="!hasActiveSession" class="text-center space-y-3">
+        <p class="text-sm font-semibold text-amber-600">{{ sessionError || "Aucun QR manager actif pour aujourd'hui." }}</p>
         <p class="text-sm text-gray-500">
           Demande au manager de generer le code du jour depuis la page "Generer QR".
         </p>
       </div>
 
       <div v-else class="flex flex-col items-center text-center gap-4">
-        <div class="p-4 bg-white border rounded-3xl shadow-xl border-primary/20">
-          <QrcodeVue :value="employeeQrPayload" :size="qrSize" level="H" render-as="svg" />
+        <!-- Boutons de sélection du type -->
+        <div class="grid grid-cols-2 gap-3 w-full max-w-xs">
+          <button
+            @click="fetchActiveSession('ENTREE')"
+            class="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all"
+            :class="currentType === 'ENTREE' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500 hover:border-primary/30'"
+          >
+            <Sunrise :size="24" />
+            <span class="text-sm font-semibold">Entrée (8h)</span>
+          </button>
+          <button
+            @click="fetchActiveSession('SORTIE')"
+            class="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all"
+            :class="currentType === 'SORTIE' ? 'border-secondary bg-secondary/10 text-secondary' : 'border-gray-200 text-gray-500 hover:border-secondary/30'"
+          >
+            <Sunset :size="24" />
+            <span class="text-sm font-semibold">Sortie (17h)</span>
+          </button>
+        </div>
+
+        <div class="p-4 bg-white border rounded-3xl shadow-xl" 
+             :class="currentType === 'ENTREE' ? 'border-primary/20' : 'border-secondary/20'">
+          <QrcodeVue :value="employeeQrPayload" :size="qrSize" level="H" render-as="canvas" />
         </div>
         <div class="flex items-center gap-2 text-sm text-gray-600">
           <QrCode class="w-4 h-4 text-primary" />
-          QR lie a la session du {{ today }} ({{ managerSession?.type }})
+          QR {{ currentType === 'ENTREE' ? "d'entrée" : "de sortie" }} - {{ today }}
         </div>
+        <button
+          @click="fetchActiveSession(currentType)"
+          class="text-xs text-primary hover:text-primary/80 underline"
+        >
+          Rafraîchir la session
+        </button>
         <p class="text-sm text-gray-500 max-w-md">
-          Presente ce QR au manager. Il doit le scanner pour confirmer ta presence.
+          Presente ce QR au manager. Il doit le scanner pour confirmer ta {{ currentType === 'ENTREE' ? "présence" : "sortie" }}.
         </p>
       </div>
     </div>

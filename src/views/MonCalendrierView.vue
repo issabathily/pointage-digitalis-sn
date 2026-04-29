@@ -194,12 +194,12 @@ function selectDay(day: CalendarDay) {
         <div v-if="canViewOthers" class="w-full sm:w-auto sm:min-w-[260px]">
           <select
             v-model.number="selectedUserId"
-            class="w-full px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-all"
+            class="w-full px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer"
             :disabled="employeesLoading || !!employeesError"
           >
             <option :value="null" disabled>Sélectionnez un employé</option>
-            <option v-for="e in employees" :key="e.id" :value="e.id">
-              {{ e.nom }} ({{ e.role }})
+            <option v-for="e in employees.filter(e => e.role === 'EMPLOYE')" :key="e.id" :value="e.id" class="cursor-pointer">
+              {{ e.nom }}
             </option>
           </select>
         </div>
@@ -348,74 +348,135 @@ function selectDay(day: CalendarDay) {
     </div>
 
     <!-- Detail panel -->
-    <div
-      v-if="selectedDay && selectedDay.isCurrentMonth"
-      class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 space-y-4"
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="opacity-0 translate-y-4"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-4"
     >
-      <div class="flex items-center justify-between">
-        <h3 class="font-bold text-dark">
-          {{ selectedDay.day }} {{ monthNames[month] }} {{ year }}
-        </h3>
-        <button
-          @click="selectedDay = null"
-          class="text-gray-400 hover:text-gray-600 transition-colors text-sm"
-        >
-          Fermer
-        </button>
-      </div>
-
-      <div v-if="selectedDay.pointage" class="space-y-2">
-        <div class="flex items-center gap-2 text-green-600">
-          <Clock :size="16" />
-          <span class="font-medium text-sm">Pointage</span>
-        </div>
-        <div class="text-sm text-gray-600 pl-6 space-y-1">
-          <p v-if="selectedDay.pointage.heure_entree">
-            <span class="text-gray-400">Entrée :</span> {{ selectedDay.pointage.heure_entree.slice(0, 5) }}
-          </p>
-          <p v-if="selectedDay.pointage.heure_sortie">
-            <span class="text-gray-400">Sortie :</span> {{ selectedDay.pointage.heure_sortie.slice(0, 5) }}
-          </p>
-          <p v-if="selectedDay.pointage.est_retard" class="text-red-500 text-xs">
-            Retard de {{ selectedDay.pointage.minutes_retard }} min
-          </p>
-          <p v-if="selectedDay.pointage.heures_sup > 0" class="text-blue-500 text-xs">
-            {{ selectedDay.pointage.heures_sup }}h supplémentaires
-          </p>
-        </div>
-      </div>
-
-      <div v-if="selectedDay.absences.length" class="space-y-2">
-        <div class="flex items-center gap-2 text-orange-600">
-          <CalendarX :size="16" />
-          <span class="font-medium text-sm">Absence</span>
-        </div>
-        <div
-          v-for="abs in selectedDay.absences"
-          :key="abs.id"
-          class="text-sm text-gray-600 pl-6 space-y-1 border-l-2 border-orange-200"
-        >
-          <p class="font-medium">{{ abs.typeAbsence }}</p>
-          <p class="text-gray-400 text-xs">{{ abs.motif }}</p>
-          <span
-            class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            :class="{
-              'bg-yellow-100 text-yellow-700': abs.statut === 'EN_ATTENTE',
-              'bg-green-100 text-green-700': abs.statut === 'VALIDEE',
-              'bg-red-100 text-red-700': abs.statut === 'REFUSEE',
-            }"
-          >
-            {{ abs.statut.replace("_", " ") }}
-          </span>
-        </div>
-      </div>
-
-      <p
-        v-if="!selectedDay.pointage && !selectedDay.absences.length"
-        class="text-sm text-gray-400 text-center py-4"
+      <div
+        v-if="selectedDay && selectedDay.isCurrentMonth"
+        class="bg-white rounded-3xl border border-gray-100 shadow-lg p-6 sm:p-8 space-y-6"
       >
-        Aucun événement ce jour
-      </p>
-    </div>
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-4 border-b border-gray-100">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <CalendarCheck :size="24" class="text-primary" />
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-dark">
+                {{ selectedDay.day }} {{ monthNames[month] }} {{ year }}
+              </h3>
+              <p class="text-xs text-gray-400">Détails de la journée</p>
+            </div>
+          </div>
+          <button
+            @click="selectedDay = null"
+            class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-all flex items-center justify-center"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Pointage Section -->
+        <div v-if="selectedDay.pointage" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+              <Clock :size="20" />
+            </div>
+            <div>
+              <h4 class="font-semibold text-dark">Pointage</h4>
+              <p class="text-xs text-gray-400">Horaires enregistrés</p>
+            </div>
+          </div>
+          <div class="bg-gray-50 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                <span class="text-sm text-gray-500">Entrée</span>
+              </div>
+              <span class="text-sm font-semibold text-dark">
+                {{ selectedDay.pointage.heure_entree?.slice(0, 5) || '--:--' }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span class="text-sm text-gray-500">Sortie</span>
+              </div>
+              <span class="text-sm font-semibold text-dark">
+                {{ selectedDay.pointage.heure_sortie?.slice(0, 5) || '--:--' }}
+              </span>
+            </div>
+            <div v-if="selectedDay.pointage.est_retard" class="pt-2 border-t border-gray-200">
+              <div class="flex items-center gap-2 text-red-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-sm font-medium">Retard de {{ selectedDay.pointage.minutes_retard }} min</span>
+              </div>
+            </div>
+            <div v-if="selectedDay.pointage.heures_sup > 0" class="pt-2 border-t border-gray-200">
+              <div class="flex items-center gap-2 text-blue-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-sm font-medium">{{ selectedDay.pointage.heures_sup }} min supplémentaires</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Absence Section -->
+        <div v-if="selectedDay.absences.length" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+              <CalendarX :size="20" />
+            </div>
+            <div>
+              <h4 class="font-semibold text-dark">Absence</h4>
+              <p class="text-xs text-gray-400">Demande enregistrée</p>
+            </div>
+          </div>
+          <div
+            v-for="abs in selectedDay.absences"
+            :key="abs.id"
+            class="bg-orange-50 rounded-2xl p-4 border-l-4 border-orange-400"
+          >
+            <div class="flex items-start justify-between mb-2">
+              <p class="font-semibold text-dark">{{ abs.typeAbsence }}</p>
+              <span
+                class="text-[10px] font-semibold px-2 py-1 rounded-full"
+                :class="{
+                  'bg-yellow-100 text-yellow-700': abs.statut === 'EN_ATTENTE',
+                  'bg-green-100 text-green-700': abs.statut === 'VALIDEE',
+                  'bg-red-100 text-red-700': abs.statut === 'REFUSEE',
+                }"
+              >
+                {{ abs.statut.replace("_", " ") }}
+              </span>
+            </div>
+            <p class="text-sm text-gray-600">{{ abs.motif }}</p>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div
+          v-if="!selectedDay.pointage && !selectedDay.absences.length"
+          class="text-center py-8"
+        >
+          <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <CalendarX :size="32" class="text-gray-400" />
+          </div>
+          <p class="text-sm text-gray-500 font-medium">Aucun événement ce jour</p>
+          <p class="text-xs text-gray-400 mt-1">Aucun pointage ou absence enregistré</p>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>

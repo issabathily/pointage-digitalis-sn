@@ -12,6 +12,8 @@ export interface Pointage {
   typePointage: string
   user: number
   userNom?: string
+  user_nom?: string
+  user_prenom?: string
 }
 
 export const usePointageStore = defineStore("pointages", {
@@ -25,36 +27,58 @@ export const usePointageStore = defineStore("pointages", {
       this.pointages = response.data
     },
 
+    async fetchTodayPointages() {
+      const response = await api.get("/pointages/today/")
+      this.pointages = response.data
+    },
+
     async confirmerPointageDepuisScan(payload: {
       employeeId: number
       employeeNom: string
       type: "ENTREE" | "SORTIE"
       date: string
     }) {
-      const localRecord: Pointage = {
-        id: Date.now(),
-        date: payload.date,
-        heure_entree: payload.type === "ENTREE" ? new Date().toLocaleTimeString() : "",
-        heure_sortie: payload.type === "SORTIE" ? new Date().toLocaleTimeString() : null,
-        est_retard: false,
-        minutes_retard: 0,
-        heures_sup: 0,
-        typePointage: payload.type,
-        user: payload.employeeId,
-        userNom: payload.employeeNom,
-      }
-
       try {
-        await api.post("/pointages/scan/", {
+        const response = await api.post("/pointages/scan/", {
           user: payload.employeeId,
           type: payload.type,
           date: payload.date,
         })
+        // Utiliser les données du backend qui incluent le nom de l'employé
+        if (response.data && response.data.pointage) {
+          this.pointages.unshift(response.data.pointage)
+        } else {
+          // Fallback si le backend ne renvoie pas le pointage
+          const localRecord: Pointage = {
+            id: Date.now(),
+            date: payload.date,
+            heure_entree: payload.type === "ENTREE" ? new Date().toLocaleTimeString() : "",
+            heure_sortie: payload.type === "SORTIE" ? new Date().toLocaleTimeString() : null,
+            est_retard: false,
+            minutes_retard: 0,
+            heures_sup: 0,
+            typePointage: payload.type,
+            user: payload.employeeId,
+            userNom: payload.employeeNom,
+          }
+          this.pointages.unshift(localRecord)
+        }
       } catch {
-        // Fallback local pour ne pas bloquer le flux de scan si l'endpoint n'existe pas encore.
+        // Fallback local en cas d'erreur
+        const localRecord: Pointage = {
+          id: Date.now(),
+          date: payload.date,
+          heure_entree: payload.type === "ENTREE" ? new Date().toLocaleTimeString() : "",
+          heure_sortie: payload.type === "SORTIE" ? new Date().toLocaleTimeString() : null,
+          est_retard: false,
+          minutes_retard: 0,
+          heures_sup: 0,
+          typePointage: payload.type,
+          user: payload.employeeId,
+          userNom: payload.employeeNom,
+        }
+        this.pointages.unshift(localRecord)
       }
-
-      this.pointages.unshift(localRecord)
     }
   }
 })

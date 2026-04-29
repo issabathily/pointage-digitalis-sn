@@ -42,16 +42,15 @@ const generateQR = async (type: "ENTREE" | "SORTIE") => {
     const response = await api.post("/qr/manager/session/create/", { type })
     const sessionData = response.data
     
+    // Simplifier le payload pour le QR code
     const payload = {
-      kind: "MANAGER_DAILY_QR",
-      type: sessionData.type,
-      date: sessionData.date,
-      sessionId: sessionData.session_id,
-      generatedAt: sessionData.generated_at,
+      s: sessionData.session_id,
+      t: sessionData.type,
+      d: sessionData.date,
     }
     currentQrData.value = JSON.stringify(payload)
     qrType.value = type
-    sessionStorage.setItem("manager:qr:session", JSON.stringify(payload))
+    sessionStorage.setItem("manager:qr:session", JSON.stringify(sessionData))
     scanResult.value = ""
     scanError.value = ""
   } catch (error) {
@@ -65,46 +64,68 @@ const generateQR = async (type: "ENTREE" | "SORTIE") => {
 // Générer le QR d'entrée par défaut (8h)
 generateQR("ENTREE")
 
+const formatTime = (timeStr: string | null) => {
+  if (!timeStr) return "--:--"
+  // Format: "14:03:44.395631" -> "14:03"
+  const parts = timeStr.split(":")
+  if (parts.length >= 2) {
+    return `${parts[0]}:${parts[1]}`
+  }
+  return timeStr
+}
+
 const handleEmployeeScan = async (decodedText: string) => {
   scanError.value = ""
   scanResult.value = ""
 
   let parsed: any
-  let managerPayload: any
+  let managerSessionData: any
 
   try {
     parsed = JSON.parse(decodedText)
-    managerPayload = JSON.parse(currentQrData.value)
+    managerSessionData = JSON.parse(sessionStorage.getItem("manager:qr:session") || "{}")
   } catch {
     scanError.value = "QR invalide: format non reconnu."
     return
   }
 
-  if (parsed?.kind !== "EMPLOYEE_ATTENDANCE_QR") {
+  // Vérifier le nouveau format simplifié
+  if (parsed?.k !== "E") {
     scanError.value = "Ce QR n'est pas un QR employe."
     return
   }
 
-  if (parsed?.date !== managerPayload?.date) {
+  if (parsed?.d !== managerSessionData?.date) {
     scanError.value = "Date invalide: QR employe hors session du jour."
     return
   }
 
-  if (!parsed?.sessionId || parsed.sessionId !== managerPayload?.sessionId) {
+  if (!parsed?.s || parsed.s !== managerSessionData?.session_id) {
     scanError.value = "Session invalide: demande a l'employe de recharger son QR."
     return
   }
 
   await pointageStore.confirmerPointageDepuisScan({
-    employeeId: Number(parsed.employeeId) || 0,
-    employeeNom: parsed.employeeNom ?? "Employe",
-    type: parsed.type === "SORTIE" ? "SORTIE" : "ENTREE",
-    date: parsed.date,
+    employeeId: Number(parsed.e) || 0,
+    employeeNom: parsed.n ?? "Employe",
+    type: parsed.t === "SORTIE" ? "SORTIE" : "ENTREE",
+    date: parsed.d,
   })
 
-  scanResult.value = `Presence confirmee pour ${parsed.employeeNom ?? "Employe"}.`
+  scanResult.value = `Presence confirmee pour ${parsed.n ?? "Employe"}.`
   showScanner.value = false
+  
+  // Rafraîchir la liste des pointages après un scan réussi
+  await pointageStore.fetchTodayPointages()
 }
+
+// Charger les pointages du jour au montage
+onMounted(() => {
+  updateViewportWidth()
+  window.addEventListener("resize", updateViewportWidth, { passive: true })
+  generateQR("ENTREE")
+  pointageStore.fetchTodayPointages()
+})
 
 </script>
 
@@ -179,7 +200,7 @@ const handleEmployeeScan = async (decodedText: string) => {
         class="p-4 bg-white border rounded-3xl shadow-xl transition-all duration-300 z-10"
         :class="qrType === 'ENTREE' ? 'border-primary/20 shadow-primary/10' : 'border-secondary/20 shadow-secondary/10'"
       >
-        <QrcodeVue :value="currentQrData" :size="qrSize" level="H" render-as="svg" />
+        <QrcodeVue :value="currentQrData" :size="qrSize" level="H" render-as="canvas" />
       </div>
 
       <!-- Bouton d'actualisation (générer un nouvel ID pour forcer la sécurité temporaire) -->
@@ -220,6 +241,52 @@ const handleEmployeeScan = async (decodedText: string) => {
       <p class="text-xs text-gray-400 mt-3">
         Le QR employe doit correspondre a la session du code manager genere aujourd'hui.
       </p>
+    </div>
+
+    <!-- Liste des pointages du jour -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 sm:p-6">
+      <h3 class="text-base font-bold text-dark mb-4">Pointages du jour</h3>
+      <div v-if="pointageStore.pointages.length === 0" class="text-center py-6">
+        <p class="text-sm text-gray-500">Aucun pointage enregistre aujourd'hui</p>
+      </div>
+      <div v-else class="space-y-3">
+        <div
+          v-for="pointage in pointageStore.pointages"
+          :key="pointage.id"
+          class="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <span class="text-sm font-semibold text-primary">
+                {{ (pointage.user_nom || pointage.userNom || '?').charAt(0).toUpperCase() }}
+              </span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-dark">
+                {{ pointage.user_nom || pointage.userNom || 'Employé' }} {{ pointage.user_prenom || '' }}
+              </p>
+              <p class="text-xs text-gray-500">
+                Entrée: {{ formatTime(pointage.heure_entree) }}
+                <span v-if="pointage.heure_sortie">| Sortie: {{ formatTime(pointage.heure_sortie) }}</span>
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span
+              v-if="pointage.est_retard"
+              class="px-2 py-1 text-xs font-semibold rounded-lg bg-amber-100 text-amber-700"
+            >
+              Retard
+            </span>
+            <span
+              v-if="pointage.heures_sup > 0"
+              class="px-2 py-1 text-xs font-semibold rounded-lg bg-blue-100 text-blue-700"
+            >
+              +{{ pointage.heures_sup }}min
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
