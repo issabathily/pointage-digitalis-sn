@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import QrcodeVue from "qrcode.vue"
 import { useAuthStore } from "@/stores/auth"
 import { QrCode } from "lucide-vue-next"
+import api from "@/services/api"
 
 const auth = useAuthStore()
 const today = new Date().toISOString().split("T")[0]
@@ -14,6 +15,7 @@ const updateViewportWidth = () => {
 onMounted(() => {
   updateViewportWidth()
   window.addEventListener("resize", updateViewportWidth, { passive: true })
+  fetchActiveSession()
 })
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateViewportWidth)
@@ -25,30 +27,44 @@ const qrSize = computed(() => {
   return 280
 })
 
-const managerSessionRaw =
-  sessionStorage.getItem("manager:qr:session") || localStorage.getItem("manager:qr:session")
-let managerSession: any = null
-try {
-  managerSession = managerSessionRaw ? JSON.parse(managerSessionRaw) : null
-} catch {
-  managerSession = null
-}
+const managerSession = ref<any>(null)
+const loadingSession = ref(true)
+const sessionError = ref("")
 
 const hasActiveSession = computed(() => {
-  return managerSession && managerSession.date === today && managerSession.sessionId
+  return managerSession.value && managerSession.value.date === today && managerSession.value.session_id
 })
 
 const employeeQrPayload = computed(() => {
+  if (!managerSession.value) return ""
   const payload = {
     kind: "EMPLOYEE_ATTENDANCE_QR",
-    sessionId: managerSession?.sessionId ?? null,
+    sessionId: managerSession.value.session_id,
     date: today,
     employeeId: auth.user?.id ?? 0,
     employeeNom: auth.user?.nom ?? "Employe",
-    type: managerSession?.type ?? "ENTREE",
+    type: managerSession.value.type ?? "ENTREE",
   }
   return JSON.stringify(payload)
 })
+
+const fetchActiveSession = async () => {
+  loadingSession.value = true
+  sessionError.value = ""
+  try {
+    const response = await api.get("/qr/manager/session/active/?type=ENTREE")
+    managerSession.value = response.data
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      sessionError.value = "Aucune session active pour aujourd'hui"
+    } else {
+      console.error("Erreur lors de la récupération de la session:", error)
+      sessionError.value = "Erreur de connexion au serveur"
+    }
+  } finally {
+    loadingSession.value = false
+  }
+}
 </script>
 
 <template>

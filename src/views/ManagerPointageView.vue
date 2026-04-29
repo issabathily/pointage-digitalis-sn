@@ -5,6 +5,7 @@ import { QrCode, Sunrise, Sunset, RefreshCw } from "lucide-vue-next"
 import QRScanner from "@/components/QRScanner.vue"
 import LoadingSpinner from "@/components/LoadingSpinner.vue"
 import { usePointageStore } from "@/stores/pointages"
+import api from "@/services/api"
 
 const pointageStore = usePointageStore()
 
@@ -37,21 +38,28 @@ const qrSize = computed(() => {
 
 const generateQR = async (type: "ENTREE" | "SORTIE") => {
   loadingQR.value = true
-  await new Promise(resolve => setTimeout(resolve, 800))
-  const today = new Date().toISOString().split("T")[0]
-  const payload = {
-    kind: "MANAGER_DAILY_QR",
-    type,
-    date: today,
-    sessionId: crypto.randomUUID(),
-    generatedAt: new Date().toISOString(),
+  try {
+    const response = await api.post("/qr/manager/session/create/", { type })
+    const sessionData = response.data
+    
+    const payload = {
+      kind: "MANAGER_DAILY_QR",
+      type: sessionData.type,
+      date: sessionData.date,
+      sessionId: sessionData.session_id,
+      generatedAt: sessionData.generated_at,
+    }
+    currentQrData.value = JSON.stringify(payload)
+    qrType.value = type
+    sessionStorage.setItem("manager:qr:session", JSON.stringify(payload))
+    scanResult.value = ""
+    scanError.value = ""
+  } catch (error) {
+    console.error("Erreur lors de la génération du QR:", error)
+    scanError.value = "Erreur lors de la génération du QR code."
+  } finally {
+    loadingQR.value = false
   }
-  currentQrData.value = JSON.stringify(payload)
-  qrType.value = type
-  sessionStorage.setItem("manager:qr:session", JSON.stringify(payload))
-  scanResult.value = ""
-  scanError.value = ""
-  loadingQR.value = false
 }
 
 // Générer le QR d'entrée par défaut (8h)
